@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="text-gradient fw-bold mb-0">Analytics Dashboard</h2>
+        {% if current_user.family_id %}
+            <p class="text-muted mb-0"><i class="fas fa-users"></i> Family: {{ current_user.family.name }} | {{ family_members|length }} Member(s)</p>
+        {% else %}
+            <p class="text-muted mb-0"><i class="fas fa-user"></i> Personal Dashboard</p>
+        {% endif %}
+    </div>
+    <div>
+        <a href="{{ url_for('expenses') }}" class="btn btn-outline-danger btn-sm me-2"><i class="fas fa-plus"></i> Expense</a>
+        <a href="{{ url_for('income') }}" class="btn btn-outline-success btn-sm"><i class="fas fa-plus"></i> Income</a>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="glass-panel p-4 h-100 text-center position-relative overflow-hidden">
+            <div class="position-absolute top-0 end-0 p-3 opacity-25">
+                <i class="fas fa-wallet fa-3x"></i>
+            </div>
+            <h6 class="text-uppercase text-muted fw-bold mb-2">Total Balance</h6>
+            <h2 class="fw-bold mb-0 {% if balance < 0 %}text-expense{% else %}text-income{% endif %}">
+                ${{ "%.2f"|format(balance) }}
+            </h2>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-panel p-4 h-100 text-center position-relative overflow-hidden border-success">
+            <div class="position-absolute top-0 end-0 p-3 opacity-25 text-success">
+                <i class="fas fa-arrow-trend-up fa-3x"></i>
+            </div>
+            <h6 class="text-uppercase text-muted fw-bold mb-2">Total Income</h6>
+            <h3 class="fw-bold text-success mb-0">${{ "%.2f"|format(total_income) }}</h3>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-panel p-4 h-100 text-center position-relative overflow-hidden border-danger">
+            <div class="position-absolute top-0 end-0 p-3 opacity-25 text-danger">
+                <i class="fas fa-arrow-trend-down fa-3x"></i>
+            </div>
+            <h6 class="text-uppercase text-muted fw-bold mb-2">Total Expenses</h6>
+            <h3 class="fw-bold text-danger mb-0">${{ "%.2f"|format(total_expense) }}</h3>
+        </div>
+    </div>
+</div>
+
+<!-- Budget Progress Section -->
+<div class="glass-panel p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0"><i class="fas fa-bullseye text-warning me-2"></i> Monthly Budget Tracker</h5>
+        {% if budget > 0 %}
+            <span class="badge bg-secondary">${{ "%.2f"|format(current_month_expense) }} / ${{ "%.2f"|format(budget) }}</span>
+        {% else %}
+            <a href="{{ url_for('settings') }}" class="btn btn-sm btn-outline-warning">Set Budget</a>
+        {% endif %}
+    </div>
+    
+    {% if budget > 0 %}
+    <div class="progress mt-3">
+        <div class="progress-bar {% if budget_progress > 90 %}bg-danger{% endif %}" role="progressbar" style="width: {{ budget_progress }}%;" aria-valuenow="{{ budget_progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+    </div>
+    <p class="text-end small text-muted mt-1 mb-0">{{ "%.1f"|format(budget_progress) }}% Used</p>
+    {% else %}
+    <p class="text-muted small mt-2 mb-0">No monthly budget set. Head over to Family & Settings to define one.</p>
+    {% endif %}
+</div>
+
+<!-- Charts Section -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="glass-panel p-4 h-100">
+            <h5 class="mb-4">Spending Over Time (Monthly)</h5>
+            <div style="position: relative; height:300px; width:100%">
+                <canvas id="monthlyChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-panel p-4 h-100">
+            <h5 class="mb-4">Top Categories</h5>
+            <div style="position: relative; height:300px; width:100%">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transactions -->
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="glass-panel p-4">
+            <div class="d-flex justify-content-between mb-3">
+                <h5 class="mb-0">Recent Expenses</h5>
+                <a href="{{ url_for('expenses') }}" class="text-decoration-none text-muted small">View All</a>
+            </div>
+            {% if expenses %}
+                <div class="table-responsive">
+                    <table class="table table-borderless table-sm align-middle">
+                        <tbody>
+                            {% for expense in expenses %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="rounded-circle bg-danger bg-opacity-10 p-2 me-3">
+                                            <i class="fas fa-shopping-bag text-danger"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold">{{ expense.category }}</div>
+                                            <div class="text-muted small">{{ expense.date.strftime('%b %d, %Y') }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-end fw-bold text-expense">-${{ "%.2f"|format(expense.amount) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted text-center py-4">No recent expenses.</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-panel p-4">
+            <div class="d-flex justify-content-between mb-3">
+                <h5 class="mb-0">Recent Income</h5>
+                <a href="{{ url_for('income') }}" class="text-decoration-none text-muted small">View All</a>
+            </div>
+            {% if incomes %}
+                <div class="table-responsive">
+                    <table class="table table-borderless table-sm align-middle">
+                        <tbody>
+                            {% for inc in incomes %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="rounded-circle bg-success bg-opacity-10 p-2 me-3">
+                                            <i class="fas fa-coins text-success"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold">{{ inc.source }}</div>
+                                            <div class="text-muted small">{{ inc.date.strftime('%b %d, %Y') }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-end fw-bold text-income">+${{ "%.2f"|format(inc.amount) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted text-center py-4">No recent income.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/api/chart_data')
+            .then(response => response.json())
+            .then(data => {
+                
+                // Chart Globals for Dark Mode Aesthetics
+                Chart.defaults.color = '#a0aec0';
+                Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
+                Chart.defaults.font.family = "'Outfit', sans-serif";
+                
+                // Category Doughnut Chart
+                const ctxCat = document.getElementById('categoryChart').getContext('2d');
+                new Chart(ctxCat, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.categories,
+                        datasets: [{
+                            data: data.category_totals,
+                            backgroundColor: [
+                                'rgba(0, 210, 255, 0.8)',
+                                'rgba(58, 123, 213, 0.8)',
+                                'rgba(0, 242, 254, 0.8)',
+                                'rgba(255, 8, 68, 0.8)',
+                                'rgba(255, 177, 153, 0.8)',
+                                'rgba(155, 81, 224, 0.8)'
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { boxWidth: 12 }
+                            }
+                        },
+                        cutout: '70%'
+                    }
+                });
+
+                // Monthly Bar Chart
+                const ctxMonth = document.getElementById('monthlyChart').getContext('2d');
+                
+                // Create a gradient for the bars
+                let gradient = ctxMonth.createLinearGradient(0, 0, 0, 400);
+                gradient.addColorStop(0, 'rgba(0, 210, 255, 0.8)');
+                gradient.addColorStop(1, 'rgba(58, 123, 213, 0.2)');
+
+                new Chart(ctxMonth, {
+                    type: 'bar',
+                    data: {
+                        labels: data.months,
+                        datasets: [{
+                            label: 'Expenses ($)',
+                            data: data.monthly_totals,
+                            backgroundColor: gradient,
+                            borderRadius: 6,
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                            },
+                            x: {
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            });
+    });
+</script>
+{% endblock %}
